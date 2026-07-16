@@ -419,13 +419,13 @@
 
         async function initApp() {
             const savedTags = await localforage.getItem(DB_TAGS);
-            if (savedTags) allTags = savedTags;
+            if (savedTags && Array.isArray(savedTags)) allTags = savedTags;
             
             const savedSettings = await localforage.getItem(DB_SETTINGS);
             if (savedSettings) settings = { ...settings, ...savedSettings };
             
             const savedQuestions = await localforage.getItem(DB_QUESTIONS);
-            if (savedQuestions) questions = savedQuestions;
+            if (savedQuestions && Array.isArray(savedQuestions)) questions = savedQuestions;
 
             const firstUse = await localforage.getItem(DB_FIRST_USE);
             if (!firstUse) await localforage.setItem(DB_FIRST_USE, Date.now());
@@ -454,9 +454,19 @@
             if (tabId === 'review') loadReviewQueue();
             else if (tabId === 'upload') renderUploadTags();
             else if (tabId === 'gallery') {
-                renderGalleryFilters();
-                renderGallery('全部');
-            } else if (tabId === 'stats') renderStats();
+                try {
+                    renderGalleryFilters();
+                    renderGallery('全部');
+                } catch (e) {
+                    console.error('Gallery render error:', e);
+                }
+            } else if (tabId === 'stats') {
+                try {
+                    renderStats();
+                } catch (e) {
+                    console.error('Stats render error:', e);
+                }
+            }
         }
 
         function hexToRgb(hex) {
@@ -1056,25 +1066,29 @@
             
             container.innerHTML = html;
 
-            if (!galleryFilterSortable) {
-                galleryFilterSortable = new Sortable(container, {
-                    animation: 150,
-                    filter: '.filter-tag-fixed',
-                    draggable: '.filter-tag-item',
-                    delay: 200, 
-                    delayOnTouchOnly: true,
-                    ghostClass: 'sortable-ghost',
-                    onEnd: async function () {
-                        const newOrder = Array.from(container.children)
-                            .filter(el => el.classList.contains('filter-tag-item'))
-                            .map(el => el.getAttribute('data-id'));
-                        
-                        allTags = newOrder;
-                        await localforage.setItem(DB_TAGS, allTags);
-                        renderManageTags();
-                        renderUploadTags();
-                    }
-                });
+            if (!galleryFilterSortable && typeof Sortable !== 'undefined') {
+                try {
+                    galleryFilterSortable = new Sortable(container, {
+                        animation: 150,
+                        filter: '.filter-tag-fixed',
+                        draggable: '.filter-tag-item',
+                        delay: 200, 
+                        delayOnTouchOnly: true,
+                        ghostClass: 'sortable-ghost',
+                        onEnd: async function () {
+                            const newOrder = Array.from(container.children)
+                                .filter(el => el.classList.contains('filter-tag-item'))
+                                .map(el => el.getAttribute('data-id'));
+                            
+                            allTags = newOrder;
+                            await localforage.setItem(DB_TAGS, allTags);
+                            renderManageTags();
+                            renderUploadTags();
+                        }
+                    });
+                } catch (e) {
+                    console.error('Sortable init error:', e);
+                }
             }
         }
 
